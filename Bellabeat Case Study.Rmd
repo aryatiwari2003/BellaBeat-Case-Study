@@ -1,0 +1,231 @@
+---
+title: "BellaBeat Case Study"
+author: "Arya Tiwari"
+date: "2024-03-22"
+output:
+  html_document: 
+    fig_width: 15
+    fig_height: 7
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# About the Company
+
+Urška Sršen and Sando Mur founded Bellabeat, a high-tech company that manufactures health-focused smart products.
+Sršen used her background as an artist to develop beautifully designed technology that informs and inspires women around
+the world. Collecting data on activity, sleep, stress, and reproductive health has allowed Bellabeat to empower women with
+knowledge about their own health and habits. Since it was founded in 2013, Bellabeat has grown rapidly and quickly positioned
+itself as a tech-driven wellness company for women.
+
+By 2016, Bellabeat had opened offices around the world and launched multiple products. Bellabeat products became available
+through a growing number of online retailers in addition to their own e-commerce channel on their website. The company has
+invested in traditional advertising media, such as radio, out-of-home billboards, print, and television, but focuses on digital
+marketing extensively. Bellabeat invests year-round in Google Search, maintaining active Facebook and Instagram pages, and
+consistently engages consumers on Twitter. Additionally, Bellabeat runs video ads on Youtube and display ads on the Google
+Display Network to support campaigns around key marketing dates.
+
+Sršen knows that an analysis of Bellabeat’s available consumer data would reveal more opportunities for growth. She has
+asked the marketing analytics team to focus on a Bellabeat product and analyze smart device usage data in order to gain
+insight into how people are already using their smart devices. Then, using this information, she would like high-level
+recommendations for how these trends can inform Bellabeat marketing strategy.
+
+## Setting Up the environment
+
+```{r}
+library(tidyverse) 
+library(reshape2)
+library(scales)
+```
+
+## Step 1 Ask: 
+
+### 1.Identify the business task:
+
+The company better target their marketing efforts into their customer's needs based on their usage of their fitness smart devices. With this info then make high-level recommendations for how these trends can inform Bellabeat marketing strategy.
+
+### 2.Consider key stakeholders:
+
+The main stakeholders here are Urška Sršen, Bellabeat’s co-founder and Chief Creative Officer; Sando Mur, Mathematician and Bellabeat’s cofounder; And the rest of the Bellabeat marketing analytics team.
+
+### 3.The business task:
+
+Given these facts, the business task is defined as searching for user patterns of usage of their smart devices in order to gain insights that would later better orientate marketing decisions. So, in one phrase it would be:
+
+How do our users use our smart devices?
+
+## Step 2 Prepare: Collect ,inspect and verify the quality and integrity of data 
+
+### 1.Determine the credibility of the data:
+
+The data is public data from FitBit Fitness Tracker Data. It's a dataset from thirty fitbit users that includes minute-level output for physical activity, heart rate, and sleep monitoring. It's a good database segmented in several tables with different aspects of the data of the device with lots of details about the user behaviour.
+
+### 2.Sort and filter the data:
+
+For this analysis I'm going to focus on the daily timeframe as my analysis is focused on detecting high-level trends in usage, not in the detailed performance of the users. For that the most interesting data for me is all the daily activity and the sleep data as they will probably show some interesting patterns but I'll have to merge some tables together to do my analysis.
+
+```{r warning=FALSE}
+#Importing the Data
+dailyActivity_merged <- read.csv("Fitabase Data 4.12.16-5.12.16/dailyActivity_merged.csv")
+
+dailyCalories_merged <- read.csv("Fitabase Data 4.12.16-5.12.16/dailyCalories_merged.csv")
+
+dailyIntensities_merged <- read.csv("Fitabase Data 4.12.16-5.12.16/dailyIntensities_merged.csv")
+
+dailySteps_merged <- read.csv("Fitabase Data 4.12.16-5.12.16/dailySteps_merged.csv")
+
+sleepDay_merged <- read.csv("Fitabase Data 4.12.16-5.12.16/sleepDay_merged.csv")
+
+weightLogInfo_merged <- read.csv("Fitabase Data 4.12.16-5.12.16/weightLogInfo_merged.csv")
+
+```
+
+Now we merge the data for daily activity and sleep, to form two tables for better view,
+
+```{r warning=FALSE}
+merge_1 <- merge(dailyActivity_merged, dailyCalories_merged, by = c("Id","Calories"))
+merge_2 <- merge(dailyIntensities_merged, dailyIntensities_merged, by = c("Id","ActivityDay","SedentaryMinutes", "LightlyActiveMinutes","FairlyActiveMinutes","VeryActiveMinutes", "SedentaryActiveDistance", "LightActiveDistance", "ModeratelyActiveDistance", "VeryActiveDistance"))
+
+merge_daily <- merge(merge_1, merge_2, by = c("Id","ActivityDay","SedentaryMinutes", "LightlyActiveMinutes","FairlyActiveMinutes","VeryActiveMinutes", "SedentaryActiveDistance", "LightActiveDistance", "ModeratelyActiveDistance", "VeryActiveDistance")) %>%
+  select(-ActivityDay) %>% rename(Date = ActivityDate)
+
+daily_data <- merge(merge_daily, sleepDay_merged, by = "Id",all=TRUE) %>% drop_na() %>% select(-SleepDay, -TrackerDistance)
+```
+
+## Step 3 and 4 Process and Analyse the data
+
+### Clean the data, and prepare the data for analysis:
+
+With all the daily data in one place I can now focus on some aspects that interest me to see if there are any trends for me to identify. I think that watching the calories burn by activity type and user and seeing the relation of the activity and the sleep quality will be the focus of my analysis. For that I will create some new summarized tables where I will classify some of the aspects of the data into more easily interpretable categories for the analysis.
+
+```{r warning=FALSE}
+data_by_usertype <- daily_data %>%
+summarise(
+user_type = factor(case_when(
+    SedentaryMinutes > mean(SedentaryMinutes) & LightlyActiveMinutes < mean(LightlyActiveMinutes) & FairlyActiveMinutes < mean(FairlyActiveMinutes) & VeryActiveMinutes < mean(VeryActiveMinutes) ~ "Sedentary",
+    
+    SedentaryMinutes < mean(SedentaryMinutes) & LightlyActiveMinutes > mean(LightlyActiveMinutes) & FairlyActiveMinutes < mean(FairlyActiveMinutes) & VeryActiveMinutes < mean(VeryActiveMinutes) ~ "Lightly Active",
+    
+    SedentaryMinutes < mean(SedentaryMinutes) & LightlyActiveMinutes < mean(LightlyActiveMinutes) & FairlyActiveMinutes > mean(FairlyActiveMinutes) & VeryActiveMinutes < mean(VeryActiveMinutes) ~ "Fairly Active",
+    
+    SedentaryMinutes < mean(SedentaryMinutes) & LightlyActiveMinutes < mean(LightlyActiveMinutes) & FairlyActiveMinutes < mean(FairlyActiveMinutes) & VeryActiveMinutes > mean(VeryActiveMinutes) ~ "Very Active",
+    
+),levels=c("Sedentary", "Lightly Active", "Fairly Active", "Very Active")), Calories, .group=Id) %>%
+  
+  
+drop_na() #Removes all the Null values
+```
+
+Using the new data frame to visualise the distribution of user type with calories burned,
+
+```{r warning=FALSE}
+data_by_usertype %>%
+  group_by(user_type) %>%
+  summarise(total = n()) %>%
+  mutate(totals = sum(total)) %>%
+  group_by(user_type) %>%
+  summarise(total_percent = total / totals) %>%
+  ggplot(aes(user_type,y=total_percent, fill=user_type)) +
+  geom_col()+
+  scale_y_continuous(labels = scales::percent) +
+  theme(legend.position="none") +
+  labs(title="User type distridution", x=NULL) +
+  theme(legend.position="none", text = element_text(size = 20),plot.title = element_text(hjust = 0.5))
+
+ggplot(data_by_usertype, aes(user_type, Calories, fill=user_type)) +
+  geom_boxplot() +
+  theme(legend.position="none") +
+  labs(title="Calories burned by User type", x=NULL) +
+  theme(legend.position="none", text = element_text(size = 20),plot.title = element_text(hjust = 0.5))
+```
+
+From the above charts we can see the distribution of users with activity levels and the calories burned with user type.
+
+It seems that the better part of the users are mostly sedentary or Lightly active users but it's very interesting to see that even though they are the biggest category the Fairly active and most importantly, the Very active are the ones with more calories burned. That is not necessarily surprising but it confirms the suspicion that the level of activity relates with the calories burned and so it's an important factor in any effort to lose weight.
+
+So lets check the relation between steps/ distance and calories burned,
+
+```{r warning=FALSE}
+daily_data %>%
+  summarise(
+    distance = factor(case_when(
+      TotalDistance < 4.5 ~ "< 4.5 mi",
+      TotalDistance >= 4.5 & TotalDistance <= 7 ~ "4.5 > & < 7 mi",
+      TotalDistance > 7 ~ "> 7 mi",
+    ),levels = c("> 7 mi","4.5 > & < 7 mi","< 4.5 mi")),
+    steps = factor(case_when(
+      TotalSteps < 6000 ~ "< 6k steps",
+      TotalSteps >= 6000 & TotalSteps <= 10000 ~ "6k > & < 10k Steps",
+      TotalSteps > 10000 ~ "> 10k Steps",
+    ),levels = c("> 10k Steps","6k > & < 10k Steps","< 6k steps")),
+    Calories) %>%
+  ggplot(aes(steps,Calories,fill=steps)) +
+  geom_boxplot() +
+  facet_wrap(~distance)+
+  labs(title="Calories burned by Steps and Distance",x=NULL) +
+  theme(legend.position="none", text = element_text(size = 15),plot.title = element_text(hjust = 0.5))
+```
+
+This boxplot represents the calories burned by the three categories of steps based on the summary values and then its faceted by the three categories of distance traveled. I did this to see which aspect is more important to the calories burned, the steps or the distance traveled and here we can see interestingly that the most calories burned are the "6k > & < 10k Steps" and "> 7 miles" which would indicate some kind of running activity that allows the user to traverse more distance with less steps.
+
+Also interesting is the parallelism between the "> 10k Steps" in the mean distance category and the "<6k Steps" in the low distance category that reinforces the idea that speed is the most important factor in calories burned.
+
+Let us also have a look on sleep type and the type of User,
+
+```{r warning=FALSE}
+sleepType_by_userType <- daily_data %>%
+  group_by(Id) %>%
+  summarise(
+    user_type = factor(case_when(
+      SedentaryMinutes > mean(SedentaryMinutes) & LightlyActiveMinutes < mean(LightlyActiveMinutes) & FairlyActiveMinutes < mean(FairlyActiveMinutes) & VeryActiveMinutes < mean(VeryActiveMinutes) ~ "Sedentary",
+      SedentaryMinutes < mean(SedentaryMinutes) & LightlyActiveMinutes > mean(LightlyActiveMinutes) & FairlyActiveMinutes < mean(FairlyActiveMinutes) & VeryActiveMinutes < mean(VeryActiveMinutes) ~ "Lightly Active",
+      SedentaryMinutes < mean(SedentaryMinutes) & LightlyActiveMinutes < mean(LightlyActiveMinutes) & FairlyActiveMinutes > mean(FairlyActiveMinutes) & VeryActiveMinutes < mean(VeryActiveMinutes) ~ "Fairly Active",
+      SedentaryMinutes < mean(SedentaryMinutes) & LightlyActiveMinutes < mean(LightlyActiveMinutes) & FairlyActiveMinutes < mean(FairlyActiveMinutes) & VeryActiveMinutes > mean(VeryActiveMinutes) ~ "Very Active",
+    ),levels=c("Sedentary", "Lightly Active", "Fairly Active", "Very Active")),
+    
+    sleep_type = factor(case_when(
+      mean(TotalMinutesAsleep) < 360 ~ "Bad Sleep",
+      mean(TotalMinutesAsleep) > 360 & mean(TotalMinutesAsleep) <= 480 ~ "Normal Sleep",
+      mean(TotalMinutesAsleep) > 480 ~ "Over Sleep",
+    ),levels=c("Bad Sleep", "Normal Sleep", "Over Sleep")), total_sleep = sum(TotalMinutesAsleep) ,.groups="drop"
+  ) %>%
+  drop_na() %>%
+  group_by(user_type) %>%
+  summarise(bad_sleepers = sum(sleep_type == "Bad Sleep"), normal_sleepers = sum(sleep_type == "Normal Sleep"),over_sleepers = sum(sleep_type == "Over Sleep"),total=n(),.groups="drop") %>%
+  group_by(user_type) %>%
+  summarise(
+    bad_sleepers = bad_sleepers / total, 
+    normal_sleepers = normal_sleepers / total, 
+    over_sleepers = over_sleepers / total,
+    .groups="drop"
+  )
+
+```
+
+Lets plot the table to find the realtion between sleep type and user type,
+
+```{r warning=FALSE}
+sleepType_by_userType_melted<- melt(sleepType_by_userType, id.vars = "user_type")
+
+ggplot(sleepType_by_userType_melted, aes(user_type, value, fill = variable)) +
+  geom_bar(position = "dodge", stat = "identity") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x=NULL, fill="Sleep type") + 
+  theme(legend.position="right",text = element_text(size = 20),plot.title = element_text(hjust = 0.5))
+
+```
+
+We can now relate how the activity levels are affected by the sleep quality of the user, We can see as we move toward more activity levels we can see a sharp decline in the oversleepers and gradual increase in normal sleepers,
+
+## Step 5 Share:
+
+From the above analaysis and graphs we can find that,
+
+1. A very clear relation between activity levels and calories burned, more the activity levels more are the calories burnt. From this we can relate that the device can inform the user to increase thier activity levels to get bettre fat loss or weight loss results.
+
+2. We also find a link between sleep quality and activity levels of the person which suggest, that for better quality of sleep a person should increase their activity levels.
+
+To help develop the marketing campaing from this, the company can focus on marketing the of the product users reviews and also other segment can be to market on the device functionality.
